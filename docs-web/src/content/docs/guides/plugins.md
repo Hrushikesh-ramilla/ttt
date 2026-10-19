@@ -102,7 +102,7 @@ Available permissions include:
 | `system.exec` | Execute specific system commands |
 | `system.env` | Read environment variables |
 | `terminal.control` | Spawn terminal tabs, send text to them, close them, and focus them |
-| `terminal.read` | Read terminal output (raw tail) and the visible screen |
+| `terminal.read` | Read terminal output (raw tail), visible screen text, and list open terminals |
 | `network.http` | Make HTTP requests (`true` for any destination, local services included, or a list of hosts or IPs with optional ports) |
 | `events.file` | Listen for file open/close/save events |
 | `events.editor` | Listen for buffer and cursor changes |

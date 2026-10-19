@@ -622,35 +622,72 @@ ttt.close_tab("my-tab-id")
 
 ### `ttt.terminal` Module
 
-Host a program (for example an AI coding agent) in a terminal tab and drive it
-from the plugin. Requires `terminal.control` (spawn/send/focus) and/or
-`terminal.read` (read/list); a function whose permission is missing is `nil`, so
-`if term.spawn then … end` is the capability check.
+Host a program (for example an AI coding agent or build runner) in a terminal tab and drive it
+from the plugin. Requires `terminal.control` (gates `spawn`, `send`, `focus`, `close`) and/or
+`terminal.read` (gates `read`, `screen`, `list`). Functions whose permissions are not granted are
+`nil` on the module table, so `if term.spawn then … end` serves as the capability check.
 
 ```lua
 local term = require("ttt.terminal")
 
+-- 1. Spawn a program in a dedicated terminal tab (requires terminal.control)
 local id, err = term.spawn{
-  shell = "pi",                    -- program to run ("" = the configured shell)
-  args  = {"--model", "…"},        -- argv, verbatim
-  cwd   = "/path/to/project",      -- working directory ("" = the workspace)
+  shell = "pi",                    -- program to run ("" = configured user shell)
+  args  = {"--model", "claude-3"}, -- argv array, verbatim
+  cwd   = "/path/to/project",      -- working directory ("" = workspace root)
   label = "pi",                    -- short badge in the tab strip (2 chars shown)
-  env   = {FORSETI_AGENT = "a1"},  -- extra env (map or {"K=V"} array)
+  env   = {FORSETI_AGENT = "a1"},  -- extra environment variables (map or {"K=V"} array)
 }
 if not id then error(err) end
 
-term.send(id, "Review the staged diff\n")   -- writes to the PTY; newline included
-local tail = term.read(id, 4000)             -- last 4000 bytes of raw PTY output
-term.focus(id)                                -- reveal the panel and select the tab
+-- 2. Send input to the terminal (requires terminal.control)
+term.send(id, "Review the staged diff\n")   -- writes to PTY stdin; trailing newline acts as Enter
 
-for _, t in ipairs(term.list()) do
-  ttt.log(string.format("%s %s %dx%d", t.id, t.label, t.cols, t.rows))
+-- 3. Read terminal output (requires terminal.read)
+local tail, err = term.read(id, 4000)       -- retained raw PTY stream (up to 4000 bytes; 0/omitted = all)
+
+-- 4. Inspect visible screen rows (requires terminal.read)
+local screen_text, err = term.screen(id)    -- rendered visible screen as plain text (no ANSI escapes)
+if screen_text and screen_text:find("Done in") then
+  ttt.log("Task finished successfully")
 end
+
+-- 5. List all open terminal tabs (requires terminal.read)
+for _, t in ipairs(term.list()) do
+  ttt.log(string.format("Tab %s [%s] %dx%d", t.id, t.label, t.cols, t.rows))
+end
+
+-- 6. Focus the terminal tab (requires terminal.control)
+term.focus(id)                              -- reveals the bottom panel and selects this tab
+
+-- 7. Close the terminal tab (requires terminal.control)
+local ok, err = term.close(id)              -- terminates child process and removes tab
 ```
 
-`read` returns the raw PTY bytes (ANSI escapes and the prompt echo included), so
-callers that parse output should strip them. The terminal tabs are ordinary
-interactive tabs: a user can type into them, resize them, and close them.
+#### Functions and Permissions
+
+| Function | Permission | Description |
+|---|---|---|
+| `term.spawn(spec)` | `terminal.control` | Spawns a new terminal tab running the specified program. `spec` is a table containing `shell` (string), `args` (array of strings), `cwd` (string), `label` (string, up to 2 characters displayed in tab strip), and `env` (map of `KEY = "val"` or array of `"KEY=val"` strings). Returns `id` (string) on success, or `nil, err`. |
+| `term.send(id, text)` | `terminal.control` | Writes input string to the terminal's PTY. Pass a trailing `\n` or `\r` to submit commands. Returns `true` on success, or `nil, err`. |
+| `term.focus(id)` | `terminal.control` | Reveals the bottom panel (if hidden) and switches active tab focus to the specified terminal. Returns `true` on success, or `nil, err`. |
+| `term.close(id)` | `terminal.control` | Terminates the terminal child process, closes the PTY, and removes the tab from the terminal panel. Returns `true` on success, or `nil, err`. |
+| `term.read(id, [max_bytes])` | `terminal.read` | Returns the retained raw PTY stream output (including ANSI escape sequences and command echo) up to `max_bytes` (capped at 64 KB; passing `0` or omitting returns all retained bytes). Returns `string` on success, or `nil, err`. |
+| `term.screen(id)` | `terminal.read` | Returns the current visible screen content as plain text lines separated by `\n` with trailing blanks trimmed. Automatically selects the active buffer (including alternate screen buffer when full-screen TUIs like vim or agents run). Contains no ANSI escape codes, making it ideal for regex pattern matching. Returns `string` on success, or `nil, err`. |
+| `term.list()` | `terminal.read` | Returns an array of tables describing all open terminal tabs: `{ { id = string, label = string, cols = number, rows = number }, … }`. Returns an empty table if none are open. |
+
+#### Raw Tail vs. Screen Text
+
+- `read(id, n)` returns raw PTY bytes exactly as emitted by the terminal, with terminal control sequences, color codes, and keyboard echo preserved. Use it when capturing raw terminal streams or streaming to an ANSI parser.
+- `screen(id)` renders what a human sees on the terminal emulator screen as newline-delimited plain text without ANSI escapes. If a TUI application runs in the alternate screen buffer, `screen(id)` extracts text from the alternate buffer directly.
+
+#### Security and Permission Scope
+
+Both terminal permissions grant broad capabilities that interact directly with the operating system:
+
+- **Arbitrary Program Execution**: `terminal.control` can execute arbitrary programs specified in `spec.shell` with plugin-chosen arguments (`spec.args`). Child programs inherit the host environment (plus any `spec.env`) and run with the host user account's full OS access.
+- **Independence from `system.exec` and `fs.*`**: Unlike `ttt.system.exec`, `terminal.control` is **not** restricted to an allowlist of permitted binary names in the plugin manifest. Similarly, child processes launched in the terminal operate directly at the OS level and are **not** constrained by `ttt.fs.read` or `ttt.fs.write` sandbox path restrictions.
+- **Access to User-Created Terminals**: Both `terminal.control` and `terminal.read` apply to **all** open terminal tabs in the editor, including tabs opened manually by the user or by other plugins. `terminal.control` can send input to or close user terminals, and `terminal.read` can list and read the contents of user terminals.
 
 ### `ttt.open_file(path, [line], [readonly])`
 
@@ -2655,6 +2692,8 @@ Permissions are declared in the manifest's `permissions` object. Boolean permiss
 | `fs.write`       | boolean \| string[] | Write files (`ttt.fs.write`). Scoped like `fs.read`. |
 | `system.exec`    | string[] | Execute specific system commands. List each allowed binary name. |
 | `system.env`     | boolean  | Read environment variables (`ttt.system.env`).    |
+| `terminal.control` | boolean | Spawn terminal tabs, send text, focus tabs, and close tabs (`ttt.terminal`). Not constrained by `system.exec` or `fs.*`. |
+| `terminal.read`  | boolean  | Read raw PTY output and visible screen text, and list open terminals (`ttt.terminal`). Accesses any tab, including user tabs. |
 | `network.http`   | boolean \| string[] | Make outbound HTTP requests (`ttt.net`). `true` allows any destination, local services included; an array (`["api.github.com", "127.0.0.1:4250"]`) restricts requests to those hosts or IPs, each with an optional port. See [Network host scoping](#network-host-scoping). |
 | `events.file`    | boolean  | Listen for file events: `file.open`, `file.close`, `file.save`. |
 | `events.editor`  | boolean  | Listen for editor events: `editor.change`, `cursor.change`, `tab.change`. |
@@ -2742,6 +2781,7 @@ local id = crypto.uuid()               -- "550e8400-e29b-41d4-a716-446655440000"
 | `ttt.events`   | Event listeners                |
 | `ttt.settings` | Read/write editor settings     |
 | `ttt.storage`  | Persistent plugin data         |
+| `ttt.terminal` | Control and inspect terminal tabs |
 
 Any other module name passed to `require()` raises an error.
 
