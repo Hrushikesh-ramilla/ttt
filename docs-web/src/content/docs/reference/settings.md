@@ -63,8 +63,8 @@ Plain defaults avoid East Asian *ambiguous*-width characters, which draw two col
 | `submenu` | `›` | `\ueab6` | Context menu item with a submenu |
 | `arrow-left` | `◂` | `\ueb6f` | Tab strip overflow, left |
 | `arrow-right` | `▸` | `\ueb70` | Tab strip overflow, right |
-| `close` | `✕` | `\uea76` | Tab close button |
-| `dirty` | `●` | `\uea71` | Unsaved changes marker in tabs |
+| `close` | `✕` | `✕` | Tab close button |
+| `dirty` | `●` | `●` | Unsaved changes marker in tabs |
 | `pinned` | `♦` | `\ueba0` | Pinned tab |
 | `lock` | `⚿` | `\uea75` | Read-only tab |
 | `more` | `⋮` | `⋮` | More actions menu buttons |

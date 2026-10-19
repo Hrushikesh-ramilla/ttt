@@ -82,8 +82,8 @@ func TestOverrideWins(t *testing.T) {
 	if got := Get(config.IconsNone, ChevronRight); got != "»" {
 		t.Errorf("plain chevron-right = %q, want the override", got)
 	}
-	if got := Rune(Close); got != '' {
-		t.Errorf("close = %q, want the nerd default", got)
+	if got := Rune(Close); got != '✕' {
+		t.Errorf("close = %q, want the plain default", got)
 	}
 	if got := Rune(ChevronDown); got != '' {
 		t.Errorf("chevron-down = %q, want the nerd default", got)
