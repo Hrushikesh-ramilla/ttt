@@ -895,8 +895,12 @@ func (s *SearchWidget) replaceInFile(groupIdx int) {
 		return
 	}
 	g := s.Groups[groupIdx]
+	matches := s.uncappedMatches([]string{g.FilePath}, g.Matches)
+	if len(matches) == 0 {
+		return
+	}
 	if s.OnReplace != nil {
-		s.OnReplace(g.FilePath, s.uncappedMatches([]string{g.FilePath}, g.Matches), s.ReplaceInput.Text, s.Options)
+		s.OnReplace(g.FilePath, matches, s.ReplaceInput.Text, s.Options)
 	}
 }
 
@@ -958,9 +962,6 @@ func (s *SearchWidget) uncappedMatches(paths []string, fallback []SearchMatch) [
 	var all []SearchMatch
 	for _, p := range paths {
 		all = append(all, found[filepath.Clean(p)]...)
-	}
-	if len(all) == 0 {
-		return fallback
 	}
 	return all
 }
