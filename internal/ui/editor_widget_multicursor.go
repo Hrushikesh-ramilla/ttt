@@ -349,7 +349,7 @@ func (e *EditorPaneWidget) SelectNextOccurrence() {
 				sel := selection.Selection{Active: true, Anchor: selection.Position{Line: l, Col: col}}
 				e.Multi.AddWithSelection(l, col+len(searchRunes), sel)
 				e.syncFromMulti()
-				e.scrollViewport()
+				e.scrollViewportToRange(l, col, col+len(searchRunes))
 				return
 			}
 		}

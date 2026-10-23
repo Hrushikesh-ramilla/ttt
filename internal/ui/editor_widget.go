@@ -621,30 +621,51 @@ func (e *EditorPaneWidget) expandFoldAtCursor() {
 }
 
 func (e *EditorPaneWidget) scrollViewport() {
+	e.scrollViewportTo(e.Cursor.Line, e.Cursor.Col)
+}
+
+func (e *EditorPaneWidget) scrollViewportTo(line, col int) {
+	e.scrollViewportToRange(line, col, col)
+}
+
+func (e *EditorPaneWidget) scrollViewportToRange(line, startCol, endCol int) {
+	e.ExpandFoldContaining(line)
 	l := e.layout()
-	curRow, _ := l.rowOf(e.Cursor.Line, e.Cursor.Col)
+	curRow, _ := l.rowOf(line, endCol)
 	top := e.topRow(l)
+	effHeight := e.Viewport.Height
+	if !e.Embedded && !e.WordWrap && effHeight > 1 && e.Viewport.Width > 0 {
+		tabW := e.resolveTabSize()
+		if line >= 0 && line < len(e.Buf.Lines) {
+			if bufColToVisualCol(e.Buf.Lines[line], len([]rune(e.Buf.Lines[line])), tabW) > e.Viewport.Width {
+				if e.Viewport.LeftCol == 0 && e.maxWidthSeen <= e.Viewport.Width {
+					effHeight--
+				}
+			}
+		}
+	}
 	if curRow < top {
 		e.setTopRow(l, curRow)
 	}
-	if curRow >= top+e.Viewport.Height {
-		e.setTopRow(l, curRow-e.Viewport.Height+1)
+	if curRow >= top+effHeight {
+		e.setTopRow(l, curRow-effHeight+1)
 	}
 	if e.WordWrap {
 		e.Viewport.LeftCol = 0
 		return
 	}
-	e.Cursor.Line = e.Buf.ClampLine(e.Cursor.Line)
+	line = e.Buf.ClampLine(line)
 	if e.Viewport.Width <= 0 {
 		e.hScrollPending = true
 		return
 	}
-	visCol := bufColToVisualCol(e.Buf.Lines[e.Cursor.Line], e.Cursor.Col, e.resolveTabSize())
-	if visCol < e.Viewport.LeftCol {
-		e.Viewport.LeftCol = visCol
+	visStart := bufColToVisualCol(e.Buf.Lines[line], startCol, e.resolveTabSize())
+	visEnd := bufColToVisualCol(e.Buf.Lines[line], endCol, e.resolveTabSize())
+	if visEnd >= e.Viewport.LeftCol+e.Viewport.Width {
+		e.Viewport.LeftCol = visEnd - e.Viewport.Width + 1
 	}
-	if visCol >= e.Viewport.LeftCol+e.Viewport.Width {
-		e.Viewport.LeftCol = visCol - e.Viewport.Width + 1
+	if visStart < e.Viewport.LeftCol {
+		e.Viewport.LeftCol = visStart
 	}
 }
 
