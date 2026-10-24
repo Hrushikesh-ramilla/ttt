@@ -631,7 +631,11 @@ func (e *EditorPaneWidget) scrollViewportTo(line, col int) {
 func (e *EditorPaneWidget) scrollViewportToRange(line, startCol, endCol int) {
 	e.ExpandFoldContaining(line)
 	l := e.layout()
-	curRow, _ := l.rowOf(line, endCol)
+	targetCol := endCol
+	if endCol > startCol {
+		targetCol = endCol - 1
+	}
+	curRow, _ := l.rowOf(line, targetCol)
 	top := e.topRow(l)
 	effHeight := e.Viewport.Height
 	if !e.Embedded && !e.WordWrap && effHeight > 1 && e.Viewport.Width > 0 {

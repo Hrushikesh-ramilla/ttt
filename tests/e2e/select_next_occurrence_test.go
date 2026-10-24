@@ -138,8 +138,8 @@ func TestSelectNextOccurrenceScrollsToNewSelection(t *testing.T) {
 	if editor.Viewport.LeftCol == 0 {
 		t.Fatalf("after third Ctrl+D LeftCol is 0, want scrolled horizontally to reveal col 80")
 	}
-	if 80 < editor.Viewport.LeftCol || 80 >= editor.Viewport.LeftCol+editor.Viewport.Width {
-		t.Fatalf("col 80 not visible in horizontal viewport [LeftCol: %d, Width: %d]",
+	if 80 < editor.Viewport.LeftCol || 85 >= editor.Viewport.LeftCol+editor.Viewport.Width {
+		t.Fatalf("needle range [80, 85] not visible in horizontal viewport [LeftCol: %d, Width: %d]",
 			editor.Viewport.LeftCol, editor.Viewport.Width)
 	}
 
