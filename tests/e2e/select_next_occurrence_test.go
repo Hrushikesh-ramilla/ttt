@@ -220,8 +220,8 @@ func TestSelectNextOccurrenceScrollsToNewSelection_WordWrap(t *testing.T) {
 		lines[i] = fmt.Sprintf("line %d", i)
 	}
 	lines[0] = "target"
-	// Line 40 wraps across multiple visual rows before target
-	lines[40] = strings.Repeat("pad ", 20) + "target"
+	// Line 40 wraps across more than a viewport's worth of visual rows before target
+	lines[40] = strings.Repeat("pad ", 300) + "target"
 
 	path := filepath.Join(h.dir, "wrap_scroll.txt")
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644); err != nil {
