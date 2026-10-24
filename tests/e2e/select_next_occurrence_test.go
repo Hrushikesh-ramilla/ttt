@@ -210,3 +210,59 @@ func TestSelectNextOccurrenceScrollsWhenWrapping(t *testing.T) {
 			editor.Viewport.TopLine, editor.Viewport.Height)
 	}
 }
+
+func TestSelectNextOccurrenceScrollsToNewSelection_WordWrap(t *testing.T) {
+	h := newTestHarness(t, 80, 20)
+	defer h.stop()
+
+	lines := make([]string, 50)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("line %d", i)
+	}
+	lines[0] = "target"
+	// Line 40 wraps across multiple visual rows before target
+	lines[40] = strings.Repeat("pad ", 20) + "target"
+
+	path := filepath.Join(h.dir, "wrap_scroll.txt")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644); err != nil {
+		t.Fatal(err)
+	}
+	h.app.EditorGroup.OpenFile(path)
+	h.app.FocusEditor()
+	h.exec("options.toggleWordWrap")
+	h.redraw()
+
+	editor := h.app.EditorGroup.Editor
+	if !editor.WordWrap {
+		t.Fatal("expected WordWrap to be true")
+	}
+
+	// 1. First Ctrl+D: selects word under cursor (line 0: "target")
+	h.pressCtrl(tcell.KeyCtrlD)
+	if got := h.app.EditorGroup.MultiCursorCount(); got != 1 {
+		t.Fatalf("cursor count = %d, want 1", got)
+	}
+
+	// 2. Second Ctrl+D: selects wrapped occurrence on line 40
+	h.pressCtrl(tcell.KeyCtrlD)
+	if got := h.app.EditorGroup.MultiCursorCount(); got != 2 {
+		t.Fatalf("cursor count = %d, want 2", got)
+	}
+
+	// In word wrap, LeftCol must remain 0
+	if editor.Viewport.LeftCol != 0 {
+		t.Fatalf("LeftCol = %d, want 0 in word wrap", editor.Viewport.LeftCol)
+	}
+
+	// Line 40 must be visible in viewport
+	if 40 < editor.Viewport.TopLine || 40 >= editor.Viewport.TopLine+editor.Viewport.Height {
+		t.Fatalf("line 40 not visible in viewport [TopLine: %d, Height: %d]",
+			editor.Viewport.TopLine, editor.Viewport.Height)
+	}
+
+	// The wrapped occurrence must be rendered on screen
+	h.redraw()
+	if !strings.Contains(h.screenText(), "target") {
+		t.Fatalf("wrapped occurrence not rendered on screen after scroll; screen:\n%s", h.screenText())
+	}
+}
