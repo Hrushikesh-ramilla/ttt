@@ -49,6 +49,7 @@ type Root struct {
 	EscapeDismissers []func() bool
 	EscapeFallback   func()
 	capturedWidget   Widget
+	lastMouseBtn     tcell.ButtonMask
 }
 
 func NewRoot(main Widget) *Root {
@@ -300,12 +301,14 @@ func (r *Root) handleMouse(ev tcell.Event) EventResult {
 		return EventConsumed
 	}
 
-	if btn&tcell.Button2 != 0 && r.OnRightClick != nil {
+	if (btn&tcell.Button2 != 0) && (btn&tcell.Button1 == 0) && (r.lastMouseBtn&tcell.Button2 == 0) && r.OnRightClick != nil {
 		mx, my := mev.Position()
 		slog.Debug("root", "action", "rightClick", "x", mx, "y", my)
 		r.OnRightClick(mx, my)
+		r.lastMouseBtn = btn
 		return EventConsumed
 	}
+	r.lastMouseBtn = btn
 
 	result := r.Main.HandleEvent(ev)
 	if result == EventCaptured {
