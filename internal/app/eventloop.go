@@ -203,12 +203,8 @@ func RunEventLoop(
 
 	handleMouse := func(tev *tcell.EventMouse) {
 		mx, my := tev.Position()
-		btn := tev.Buttons()
-		if btn&tcell.Button2 != 0 && (btn&tcell.Button1 != 0 || mx != mouseX || my != mouseY) {
-			btn &^= tcell.Button2
-			tev = tcell.NewEventMouse(mx, my, btn, tev.Modifiers())
-		}
 		mouseX, mouseY = mx, my
+		btn := tev.Buttons()
 		if btn != 0 {
 			app.stopHoverTask()
 			app.DismissSignatureHelp()
