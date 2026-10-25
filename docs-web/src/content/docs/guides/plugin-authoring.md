@@ -1534,7 +1534,7 @@ panel:markdown({ text = readme_content, margin_top = 1 })
 | `wrap_width` | number | no | Maximum column width for prose wrapping (positive integer). Overrides the global `markdown.wrapWidth` setting for this widget only. If omitted, uses the global setting. |
 | + [box model fields](#box-model) | | | Margin and padding. |
 
-Prose lines wrap at `wrap_width` when specified, or fall back to the `markdown.wrapWidth` setting (default 80). Headings, bold, italic, code spans, fenced code blocks, lists, and links are styled using the theme's styles. Text inside the widget can be selected with the mouse and copied.
+Prose lines wrap at `wrap_width` when specified, or fall back to the `markdown.wrapWidth` setting (default 80). Headings, bold, italic, code spans, fenced code blocks, lists, and links are styled using the theme's styles. Text inside the widget can be selected with the mouse and copied. HTML `<details>` and `<summary>` tags render as collapsible disclosure sections (`▶ ` / `▼ `) that start collapsed unless `<details open>` is specified; clicking or navigating with Tab/Enter/Space toggles them.
 
 ### Image
 

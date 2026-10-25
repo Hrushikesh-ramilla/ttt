@@ -25,11 +25,12 @@ const (
 	KindListItem
 	KindBlockquote
 	KindBlank
+	KindSummary
 )
 
 func (k LineKind) Wrappable() bool {
 	switch k {
-	case KindParagraph, KindHeading, KindListItem, KindBlockquote:
+	case KindParagraph, KindHeading, KindListItem, KindBlockquote, KindSummary:
 		return true
 	default:
 		return false
@@ -42,8 +43,9 @@ type Span struct {
 }
 
 type Line struct {
-	Spans []Span
-	Kind  LineKind
+	Spans    []Span
+	Kind     LineKind
+	DetailID int
 }
 
 func (l Line) Text() string {
@@ -96,7 +98,7 @@ func WrapLine(line Line, width int) []Line {
 			}
 			spans = append(spans, Span{Text: string(chunk[start:pos]), Style: st})
 		}
-		result = append(result, Line{Kind: line.Kind, Spans: spans})
+		result = append(result, Line{Kind: line.Kind, Spans: spans, DetailID: line.DetailID})
 		runes = runes[end:]
 		styles = styles[end:]
 	}
@@ -116,14 +118,15 @@ func FlattenStyles(line Line) []term.Style {
 var md = goldmark.New(goldmark.WithExtensions(extension.Table))
 
 func Render(text string) []Line {
+	return Parse(text).Render()
+}
+
+func renderMarkdownRaw(text string) []Line {
 	src := []byte(text)
 	doc := md.Parser().Parse(gmtext.NewReader(src))
 	r := &renderer{src: src}
 	r.renderNode(doc)
 	r.dropTrailingBlanks()
-	if len(r.lines) == 0 {
-		r.lines = []Line{{Spans: []Span{{Text: "", Style: term.StyleDefault}}}}
-	}
 	return r.lines
 }
 
@@ -397,6 +400,11 @@ func (r *renderer) walkInline(n ast.Node, style term.Style, spans *[]Span) {
 		case *ast.AutoLink:
 			txt := string(c.URL(r.src))
 			*spans = append(*spans, Span{Text: txt, Style: style})
+		case *ast.RawHTML:
+			for i := 0; i < c.Segments.Len(); i++ {
+				seg := c.Segments.At(i)
+				*spans = append(*spans, Span{Text: string(seg.Value(r.src)), Style: style})
+			}
 		default:
 			r.walkInline(child, style, spans)
 		}
