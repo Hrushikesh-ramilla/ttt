@@ -391,10 +391,6 @@ func (fm *FocusManager) HandleEvent(ev tcell.Event) EventResult {
 			fm.lastEventTarget = fm.items[hit]
 			return fm.items[hit].HandleEvent(ev)
 		}
-		if fw := fm.Focused(); fw != nil {
-			fm.lastEventTarget = fw
-			return fw.HandleEvent(ev)
-		}
 	}
 	return EventIgnored
 }
