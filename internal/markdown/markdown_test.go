@@ -755,3 +755,60 @@ func TestDetailsPreservesMarkdownStylesInside(t *testing.T) {
 		t.Error("expected KindTable inside open details")
 	}
 }
+
+func TestNestedSingleLineDetailsTrailingContent(t *testing.T) {
+	input := `<details>
+<summary>Outer</summary>
+<details><summary>Inner</summary>Nested body</details>
+Trailing content inside outer
+</details>
+
+Content outside outer`
+
+	doc := Parse(input)
+	if len(doc.Details()) != 2 {
+		t.Fatalf("expected 2 details, got %d", len(doc.Details()))
+	}
+
+	// When outer is collapsed, content outside the outer section must remain visible.
+	doc.SetOpen(1, false)
+	rendered := doc.Render()
+	foundOutside := false
+	foundInside := false
+	for _, l := range rendered {
+		text := l.Text()
+		if strings.Contains(text, "Content outside outer") {
+			foundOutside = true
+		}
+		if strings.Contains(text, "Trailing content inside outer") {
+			foundInside = true
+		}
+	}
+	if !foundOutside {
+		t.Error("content outside outer details should remain visible when outer is collapsed")
+	}
+	if foundInside {
+		t.Error("content inside outer details should be hidden when outer is collapsed")
+	}
+
+	// When outer is expanded, both inside and outside content are visible.
+	doc.SetOpen(1, true)
+	renderedOpen := doc.Render()
+	foundOutsideOpen := false
+	foundInsideOpen := false
+	for _, l := range renderedOpen {
+		text := l.Text()
+		if strings.Contains(text, "Content outside outer") {
+			foundOutsideOpen = true
+		}
+		if strings.Contains(text, "Trailing content inside outer") {
+			foundInsideOpen = true
+		}
+	}
+	if !foundOutsideOpen {
+		t.Error("content outside outer details should be visible when outer is open")
+	}
+	if !foundInsideOpen {
+		t.Error("content inside outer details should be visible when outer is open")
+	}
+}

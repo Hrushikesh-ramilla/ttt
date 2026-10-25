@@ -298,21 +298,29 @@ func parseDocument(lines []string, nextID *int) *Document {
 						}
 					}
 
-					if currIndent <= 3 && detailsStartRegex.MatchString(currTrimmedLeft) {
-						depth++
-						innerLines = append(innerLines, curr)
-						i++
-						continue
-					}
-
-					if currIndent <= 3 && detailsCloseRegex.MatchString(currTrimmedLeft) {
-						depth--
-						if depth == 0 {
-							break
+					if currIndent <= 3 {
+						hasStart := detailsStartRegex.MatchString(currTrimmedLeft)
+						hasClose := detailsCloseRegex.MatchString(currTrimmedLeft)
+						if hasStart && hasClose {
+							innerLines = append(innerLines, curr)
+							i++
+							continue
 						}
-						innerLines = append(innerLines, curr)
-						i++
-						continue
+						if hasStart {
+							depth++
+							innerLines = append(innerLines, curr)
+							i++
+							continue
+						}
+						if hasClose {
+							depth--
+							if depth == 0 {
+								break
+							}
+							innerLines = append(innerLines, curr)
+							i++
+							continue
+						}
 					}
 
 					innerLines = append(innerLines, curr)

@@ -40,13 +40,39 @@ func (m *MarkdownWidget) Focusable() bool {
 
 func (m *MarkdownWidget) SetFocused(f bool) {
 	m.focused = f
-	if !f {
-		m.focusedDetailID = 0
+	if f && m.doc != nil {
+		if !m.isDetailVisible(m.focusedDetailID) {
+			if visible := m.doc.VisibleDetailIDs(); len(visible) > 0 {
+				m.focusedDetailID = visible[0]
+			} else {
+				m.focusedDetailID = 0
+			}
+		}
 	}
+}
+
+func (m *MarkdownWidget) isDetailVisible(id int) bool {
+	if id <= 0 || m.doc == nil {
+		return false
+	}
+	for _, vis := range m.doc.VisibleDetailIDs() {
+		if vis == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *MarkdownWidget) IsFocused() bool {
 	return m.focused
+}
+
+func (m *MarkdownWidget) Document() *markdown.Document {
+	return m.doc
+}
+
+func (m *MarkdownWidget) FocusedDetailID() int {
+	return m.focusedDetailID
 }
 
 func (m *MarkdownWidget) SetScrollParent(sv *ScrollViewWidget) {
@@ -205,7 +231,7 @@ func (m *MarkdownWidget) Render(surface Surface) {
 				}
 				if m.sel.Contains(y, col, m.selEnd.Line, m.selEnd.Col) {
 					cell.BgStyle = term.StyleSelection
-				} else if line.Kind == markdown.KindSummary && line.DetailID == m.focusedDetailID {
+				} else if m.focused && line.Kind == markdown.KindSummary && line.DetailID == m.focusedDetailID {
 					cell.BgStyle = term.StyleSidebarSelected
 				}
 				surface.SetCell(x, y, cell)
@@ -219,7 +245,7 @@ func (m *MarkdownWidget) Render(surface Surface) {
 					surface.SetCell(pad, y, term.Cell{Ch: ' ', BgStyle: term.StyleSelection})
 				}
 			}
-		} else if line.Kind == markdown.KindSummary && line.DetailID == m.focusedDetailID {
+		} else if m.focused && line.Kind == markdown.KindSummary && line.DetailID == m.focusedDetailID {
 			for pad := x; pad < w; pad++ {
 				surface.SetCell(pad, y, term.Cell{Ch: ' ', BgStyle: term.StyleSidebarSelected})
 			}
@@ -288,11 +314,11 @@ func (m *MarkdownWidget) HandleEvent(ev tcell.Event) EventResult {
 		if m.doc != nil && len(m.doc.Details()) > 0 {
 			switch e.Key() {
 			case tcell.KeyTab:
-				if m.focusNextDetail() {
+				if m.focusNextDetail(true) {
 					return EventConsumed
 				}
 			case tcell.KeyBacktab:
-				if m.focusPrevDetail() {
+				if m.focusPrevDetail(true) {
 					return EventConsumed
 				}
 			case tcell.KeyEscape:
@@ -346,7 +372,47 @@ func (m *MarkdownWidget) HandleEvent(ev tcell.Event) EventResult {
 	return EventIgnored
 }
 
-func (m *MarkdownWidget) focusNextDetail() bool {
+// FocusNextDetail advances keyboard focus to the next visible summary without wrapping.
+// Returns true if focus advanced, false if already at the last visible summary.
+func (m *MarkdownWidget) FocusNextDetail() bool {
+	return m.focusNextDetail(false)
+}
+
+// FocusPrevDetail moves keyboard focus to the previous visible summary without wrapping.
+// Returns true if focus moved, false if already at the first visible summary.
+func (m *MarkdownWidget) FocusPrevDetail() bool {
+	return m.focusPrevDetail(false)
+}
+
+// FocusFirstDetail sets keyboard focus to the first visible summary.
+func (m *MarkdownWidget) FocusFirstDetail() bool {
+	if m.doc == nil {
+		return false
+	}
+	visible := m.doc.VisibleDetailIDs()
+	if len(visible) == 0 {
+		return false
+	}
+	m.focusedDetailID = visible[0]
+	m.ensureDetailVisible(m.focusedDetailID)
+	return true
+}
+
+// FocusLastDetail sets keyboard focus to the last visible summary.
+func (m *MarkdownWidget) FocusLastDetail() bool {
+	if m.doc == nil {
+		return false
+	}
+	visible := m.doc.VisibleDetailIDs()
+	if len(visible) == 0 {
+		return false
+	}
+	m.focusedDetailID = visible[len(visible)-1]
+	m.ensureDetailVisible(m.focusedDetailID)
+	return true
+}
+
+func (m *MarkdownWidget) focusNextDetail(wrap bool) bool {
 	if m.doc == nil {
 		return false
 	}
@@ -361,7 +427,12 @@ func (m *MarkdownWidget) focusNextDetail() bool {
 			break
 		}
 	}
-	if currentIdx < 0 || currentIdx >= len(visible)-1 {
+	if currentIdx < 0 {
+		m.focusedDetailID = visible[0]
+	} else if currentIdx >= len(visible)-1 {
+		if !wrap {
+			return false
+		}
 		m.focusedDetailID = visible[0]
 	} else {
 		m.focusedDetailID = visible[currentIdx+1]
@@ -370,7 +441,7 @@ func (m *MarkdownWidget) focusNextDetail() bool {
 	return true
 }
 
-func (m *MarkdownWidget) focusPrevDetail() bool {
+func (m *MarkdownWidget) focusPrevDetail(wrap bool) bool {
 	if m.doc == nil {
 		return false
 	}
@@ -385,7 +456,12 @@ func (m *MarkdownWidget) focusPrevDetail() bool {
 			break
 		}
 	}
-	if currentIdx <= 0 {
+	if currentIdx < 0 {
+		m.focusedDetailID = visible[len(visible)-1]
+	} else if currentIdx <= 0 {
+		if !wrap {
+			return false
+		}
 		m.focusedDetailID = visible[len(visible)-1]
 	} else {
 		m.focusedDetailID = visible[currentIdx-1]

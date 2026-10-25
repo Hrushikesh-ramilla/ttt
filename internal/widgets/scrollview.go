@@ -274,7 +274,12 @@ func (sv *ScrollViewWidget) scrollHRight(amount int) {
 	sv.scrollX = horizontal.clampOffset(sv.scrollX + amount)
 }
 
-func (sv *ScrollViewWidget) Focusable() bool         { return true }
+func (sv *ScrollViewWidget) Focusable() bool {
+	if fw, ok := sv.Child.(FocusableWidget); ok && fw.Focusable() {
+		return false
+	}
+	return true
+}
 func (sv *ScrollViewWidget) SetFocused(focused bool) { sv.focused = focused }
 func (sv *ScrollViewWidget) IsFocused() bool         { return sv.focused }
 

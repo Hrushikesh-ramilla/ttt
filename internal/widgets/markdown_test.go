@@ -540,3 +540,78 @@ func TestMarkdownWidgetDetailsScrollClamping(t *testing.T) {
 		t.Fatalf("expected clamped scrollY 0, got %d", sv.scrollY)
 	}
 }
+
+func TestMarkdownWidgetFocusPreservedAcrossSetFocused(t *testing.T) {
+	m := NewMarkdownWidget()
+	m.SetContent("<details><summary>One</summary>Body 1</details>\n\n<details><summary>Two</summary>Body 2</details>")
+	m.SetFocused(true)
+
+	if m.focusedDetailID != 1 {
+		t.Fatalf("expected detail 1 initially focused, got %d", m.focusedDetailID)
+	}
+
+	m.FocusNextDetail()
+	if m.focusedDetailID != 2 {
+		t.Fatalf("expected detail 2 focused after FocusNextDetail, got %d", m.focusedDetailID)
+	}
+
+	// Losing focus (e.g. during FocusManager.Collect redraw cycle) must not clear focusedDetailID
+	m.SetFocused(false)
+	if m.IsFocused() {
+		t.Error("expected IsFocused() to be false")
+	}
+
+	m.SetFocused(true)
+	if m.focusedDetailID != 2 {
+		t.Fatalf("expected detail 2 to remain focused after regaining focus, got %d", m.focusedDetailID)
+	}
+}
+
+func TestMarkdownWidgetFocusNavigationAPI(t *testing.T) {
+	m := NewMarkdownWidget()
+	m.SetContent("<details><summary>One</summary>Body 1</details>\n\n<details><summary>Two</summary>Body 2</details>\n\n<details><summary>Three</summary>Body 3</details>")
+
+	if !m.FocusFirstDetail() || m.focusedDetailID != 1 {
+		t.Fatalf("expected FocusFirstDetail=1, got %d", m.focusedDetailID)
+	}
+
+	if !m.FocusNextDetail() || m.focusedDetailID != 2 {
+		t.Fatalf("expected FocusNextDetail=2, got %d", m.focusedDetailID)
+	}
+
+	if !m.FocusNextDetail() || m.focusedDetailID != 3 {
+		t.Fatalf("expected FocusNextDetail=3, got %d", m.focusedDetailID)
+	}
+
+	// At last detail, FocusNextDetail must return false (no wrapping)
+	if m.FocusNextDetail() {
+		t.Error("expected FocusNextDetail at last detail to return false")
+	}
+	if m.focusedDetailID != 3 {
+		t.Fatalf("expected focusedDetailID to stay 3, got %d", m.focusedDetailID)
+	}
+
+	if !m.FocusPrevDetail() || m.focusedDetailID != 2 {
+		t.Fatalf("expected FocusPrevDetail=2, got %d", m.focusedDetailID)
+	}
+
+	if !m.FocusLastDetail() || m.focusedDetailID != 3 {
+		t.Fatalf("expected FocusLastDetail=3, got %d", m.focusedDetailID)
+	}
+
+	if !m.FocusPrevDetail() || m.focusedDetailID != 2 {
+		t.Fatalf("expected FocusPrevDetail=2, got %d", m.focusedDetailID)
+	}
+
+	if !m.FocusPrevDetail() || m.focusedDetailID != 1 {
+		t.Fatalf("expected FocusPrevDetail=1, got %d", m.focusedDetailID)
+	}
+
+	// At first detail, FocusPrevDetail must return false (no wrapping)
+	if m.FocusPrevDetail() {
+		t.Error("expected FocusPrevDetail at first detail to return false")
+	}
+	if m.focusedDetailID != 1 {
+		t.Fatalf("expected focusedDetailID to stay 1, got %d", m.focusedDetailID)
+	}
+}
