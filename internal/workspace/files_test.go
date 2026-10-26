@@ -167,4 +167,3 @@ func TestListFilesWalkDirDependencyExclusions(t *testing.T) {
 		t.Fatalf("expected all files when ShowGitIgnored=true, got %v, want %v", allRels, wantAll)
 	}
 }
-
