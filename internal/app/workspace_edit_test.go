@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/eugenioenko/ttt/internal/config"
+	"github.com/eugenioenko/ttt/internal/core/undo"
 	"github.com/eugenioenko/ttt/internal/lsp"
 )
 
@@ -184,5 +185,48 @@ func TestPickCodeActionEditSkipsFileOperations(t *testing.T) {
 	}
 	if got := pickCodeActionEdit([]lsp.CodeAction{{Edit: empty}}); got != nil {
 		t.Errorf("picked %+v, want nothing", got)
+	}
+}
+
+func TestRenameSaveOnRenamePreservesSavePointAcrossSubsequentEdits(t *testing.T) {
+	a, dir := workspaceEditTestApp(t, map[string]string{"main.go": "foo bar\n"})
+	path := filepath.Join(dir, "main.go")
+	a.EditorGroup.OpenFile(path)
+	uri := FileURI(path)
+
+	a.Settings.LSP.SaveOnRename = true
+
+	// Apply a rename workspace edit with two successive documentChanges batches
+	a.ApplyWorkspaceEdit(decodeWorkspaceEdit(t, `{"documentChanges":[`+
+		renameEdit(uri, 0, 0, 0, "X")+","+renameEdit(uri, 0, 5, 8, "baz")+`]}`))
+
+	if got := bufferText(t, a, path); got != "Xfoo baz\n" {
+		t.Fatalf("main.go = %q, want \"Xfoo baz\\n\"", got)
+	}
+
+	// The file on disk was saved by SaveOnRename, so the buffer should be clean
+	if a.EditorGroup.IsDirtyPath(path) {
+		t.Fatalf("expected main.go to be clean after SaveOnRename")
+	}
+
+	// Two subsequent independent edits
+	editor := a.EditorGroup.Editor
+	editor.ExecCommand(&undo.InsertStringCommand{Line: 0, Col: 0, Text: "FIRST"})
+	editor.ExecCommand(&undo.InsertStringCommand{Line: 0, Col: 5, Text: "SECOND"})
+
+	if !a.EditorGroup.IsDirtyPath(path) {
+		t.Fatalf("expected main.go to be dirty after subsequent edits")
+	}
+
+	// Undo once: FIRST is still present in buffer while disk has "Xfoo baz", so tab must be dirty
+	a.EditorGroup.Undo()
+	if !a.EditorGroup.IsDirtyPath(path) {
+		t.Fatalf("expected main.go to still be dirty after undoing only one of two subsequent edits")
+	}
+
+	// Undo second edit: buffer matches disk ("Xfoo baz"), tab must be clean
+	a.EditorGroup.Undo()
+	if a.EditorGroup.IsDirtyPath(path) {
+		t.Fatalf("expected main.go to be clean after undoing back to saved state")
 	}
 }

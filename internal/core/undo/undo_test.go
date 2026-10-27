@@ -869,6 +869,93 @@ func TestNestedTransactions(t *testing.T) {
 	}
 }
 
+func TestTransactionSavePointRemappedAtTransactionEnd(t *testing.T) {
+	b := &buffer.Buffer{Lines: []string{"foo bar"}}
+	s := &UndoStack{}
+
+	s.BeginTransaction()
+	cmd1 := &InsertStringCommand{Line: 0, Col: 0, Text: "X"}
+	cmd1.Apply(b)
+	s.Push(cmd1)
+
+	cmd2 := &DeleteSelectionCommand{StartLine: 0, StartCol: 5, EndLine: 0, EndCol: 8}
+	cmd2.Apply(b)
+	s.Push(cmd2)
+
+	cmd3 := &InsertStringCommand{Line: 0, Col: 5, Text: "baz"}
+	cmd3.Apply(b)
+	s.Push(cmd3)
+
+	// Save happens while transaction is open (e.g. SaveOnRename)
+	s.MarkSaved()
+
+	s.EndTransaction()
+
+	if !s.AtSavePoint() {
+		t.Fatalf("expected AtSavePoint() true immediately after collapsing transaction that was saved at end")
+	}
+
+	// Make 2 subsequent independent edits (e.g. Paste FIRST, Paste SECOND)
+	cmd4 := &InsertStringCommand{Line: 0, Col: 0, Text: "FIRST"}
+	cmd4.Apply(b)
+	s.Push(cmd4)
+
+	cmd5 := &InsertStringCommand{Line: 0, Col: 5, Text: "SECOND"}
+	cmd5.Apply(b)
+	s.Push(cmd5)
+
+	if s.AtSavePoint() {
+		t.Fatalf("expected AtSavePoint() false after subsequent edits")
+	}
+
+	// Undo once: buffer still differs from disk/save point
+	s.Undo(b)
+	if s.AtSavePoint() {
+		t.Fatalf("expected AtSavePoint() false after undoing one of two subsequent edits")
+	}
+
+	// Undo second edit: back to save point
+	s.Undo(b)
+	if !s.AtSavePoint() {
+		t.Fatalf("expected AtSavePoint() true after undoing both subsequent edits")
+	}
+
+	// Undo the transaction itself: buffer differs from save point
+	s.Undo(b)
+	if s.AtSavePoint() {
+		t.Fatalf("expected AtSavePoint() false after undoing the saved transaction")
+	}
+}
+
+func TestTransactionSavePointInvalidatedInsideTransaction(t *testing.T) {
+	b := &buffer.Buffer{Lines: []string{"a"}}
+	s := &UndoStack{}
+
+	s.BeginTransaction()
+	cmd1 := &InsertStringCommand{Line: 0, Col: 1, Text: "b"}
+	cmd1.Apply(b)
+	s.Push(cmd1)
+
+	// Save happens inside transaction before second edit
+	s.MarkSaved()
+
+	cmd2 := &InsertStringCommand{Line: 0, Col: 2, Text: "c"}
+	cmd2.Apply(b)
+	s.Push(cmd2)
+
+	s.EndTransaction()
+
+	// The intermediate save point inside the collapsed batch must be invalidated
+	if s.AtSavePoint() {
+		t.Fatalf("expected AtSavePoint() false because save point occurred inside collapsed transaction")
+	}
+
+	s.Undo(b)
+	if s.AtSavePoint() {
+		t.Fatalf("expected AtSavePoint() false after undoing collapsed transaction")
+	}
+}
+
 func TestDeleteSelectionCommandComputeDeleted(t *testing.T) {
 	tests := []struct {
 		name  string
